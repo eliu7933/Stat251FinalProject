@@ -1,0 +1,27 @@
+---
+title: "Stat251 Final Project"
+author: "Emily Liu"
+date: "3/25/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# filepath <- paste0('~/Documents/Winter 2022/Stat251/alzheimer.csv')
+filepath <- 'alzheimer.csv'
+alz <- read.csv(filepath, stringsAsFactors = TRUE)
+```
+
+
+## Data exploration
+```{r}
+# measurements of total intracranial volume
+data <- alz %>% filter(Group == 'Demented')
+hist(data$eTIV)
+
+# measurements of whole brain volume
+```
+
