@@ -2,7 +2,9 @@
 title: "Stat251 Final Project"
 author: "Emily Liu"
 date: "3/25/2022"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -11,45 +13,56 @@ library(tidyverse)
 library(invgamma)
 ```
 
-1. 
+## Introduction
 
-Alzheimer’s is a brain disease where cells degenerate and cause memory loss. 40 million people worldwide suffer from this disease and a cure does not exist. Although there is no definitive cause of Alzheimer’s, scientists speculate that genetics, aging, and environmental influences may affect the probability of developing the disease. Some specialists have found that the larger the brain, the more the brain may combat against the effects of cognitive atrophy. The total intracranial volume (TIV) is a way to quantify the size of the brain. TIV includes the volume of the cranium, brain, and spinal fluid. To discover how brain size relates to Alzheimer’s, we will investigate the average TIV for patients 60 years and older of those with and without the disease.
+Alzheimer’s is a brain disease where cells degenerate and cause memory loss. 40 million people worldwide suffer from this disease and a cure does not exist. Although there is no definitive cause of Alzheimer’s, scientists speculate that genetics, aging, and environmental influences may affect the probability of developing the disease. Some specialists have found that the larger the brain, the more the brain may combat against the effects of cognitive atrophy. The total intracranial volume (TIV) is a way to quantify the size of the brain. TIV includes the volume of the cranium, brain, and spinal fluid. To discover how brain size relates to Alzheimer’s, we will investigate the average TIV for patients 60 years and older of those with and without the disease. The parameters of interest is the average TIV for demented and non-demented patients.
 
-2.
+## Methods
 
-Likelihood:
-$$
-x_i | \mu, \sigma^2 ~ N(\mu, \sigma^2), i = 1, ...n
-$$
-
-3.
-Priors for demented population:
-$\mu_D \sim N(\lambda, tau^2)$
-
-$\sigma_D \sim IG(\gamma, \phi)$
-
-Priors for non-demented population:
-$\mu_N \sim N(\lambda, tau^2)$
-
-$\sigma_N \sim IG(\gamma, \phi)$
-
-
-4.
 ```{r}
 # filepath <- paste0('~/Documents/Winter 2022/Stat251/alzheimer.csv')
 filepath <- 'alzheimer.csv'
 alz <- read.csv(filepath, stringsAsFactors = TRUE)
 ```
 
-
-## Data exploration
 ```{r}
 # measurements of total intracranial volume
 demented <- alz %>% filter(Group == 'Demented')
 nondemented <- alz %>% filter(Group == 'Nondemented')
-hist(data$eTIV)
-alz
 ```
+
+Figure 1 is a plot of the TIV values for demented and nondemented groups. We see that these values have a uniform and bell-shaped distribution therefore, we use a normal distribution with parameters $\mu$ and $\sigma^2$ as the likelihood to model our data. The likelihood of our model is also listed below.
+
+```{r, fig.cap='Histograms of TIV for Alzheimer's patients.', fig.align='center', out.width='50%', fig.show='hold'}
+
+# histogram for demented patients
+ggplot(demented, aes(x = eTIV)) +
+  geom_histogram() +
+  theme_bw() +
+  labs(title = 'Histogram of TIV for Demented Patients')
+
+# histogram for nondemented patients
+ggplot(nondemented, aes(x = eTIV)) +
+  geom_histogram() +
+  theme_bw() +
+  labs(title = 'Histogram of TIV for Nondemented Patients')
+```
+
+$x_i | \mu, \sigma^2 \sim N(\mu, \sigma^2),\,\,i = 1, ...n$
+
+We assume that the prior parameter $\mu$ which represents that average TIV for both populations, is normally distributed. We also assume that the variance denoted by $\sigma^2$ follows an inverse gamma distribution because the variance of TIV for both populations is positive and right-skewed. The distributions of the prior distributions for our parameters are listed below. We assume the prior distributions for both the demented (D) and nondemented (N) populations to be the same.
+
+Prior distribution for demented popluation:
+
+$\mu_D \sim N(\lambda, tau^2)$
+
+$\sigma_D \sim IG(\gamma, \phi)$
+
+Prior distribution for non-demented population:
+
+$\mu_N \sim N(\lambda, tau^2)$
+
+$\sigma_N \sim IG(\gamma, \phi)$
 
 ```{r}
 # Prior for mu
@@ -57,16 +70,36 @@ prior_mean <- 1500 # lambda
 prior_var <- 31000 # Tau^2
 
 # Prior for sigma2
-prior_mean_sigma2 <- 1
-prior_var_sigma2 <- 1
-
-
+prior_gamma <- 1
+prior_phi <- 1
 ```
 
-5.
+
+```{r}
+# plot prior distribution of mu
+curve(dnorm(x, prior_mean, sqrt(prior_var)), xlim = c(500, 2500),
+      main = 'Prior Distribution of' ~ expression(mu))
+
+# plot prior distribution of sigma2
+curve(dinvgamma(x, prior_gamma, sqrt(prior_phi)), xlim = c(0, 200),
+      main = 'Prior Distribution of' ~ expression(sigma^2))
+```
+
+In order to investigate this question, we analyzed a dataset taken from Kaggle that includes data from a sampled set of patients 60 years and older. Metrics collected on these individuals include whether they have Alzheimer’s (our response variable), gender, age, education level, TIV measurements (our explanatory variable), and other physiological characteristics. The outcome variable of interest is whether the patient is demented or non-demented.
+
+??put in kable
+```{r}
+# summaries of data
+summary(demented$eTIV)
+summary(nondemented$eTIV)
+```
+
+## Results
+
+Because of our likelihood and prior distributions, we can approximate a posterior distribution for both populations $\mu$ and $\sigma^2$ with Gibbs sampling.
+
 ```{r}
 demented <- alz %>% filter(Group == 'Demented') %>% select(eTIV)
-
 
 # Find the posterior of mu using Gibbs sampling.
 n <- length(demented)
@@ -74,6 +107,7 @@ n <- length(demented)
 lambda <- 1500  # Prior Mean for mu
 tau2 <- 31000  # Prior Variance for mu
 sigma2 <- 1  # Sample Variance
+mu <- 1500 #????
 
 gamma <- 1  # Prior Gamma for sigma2
 phi <- 1  # Prior Phi for sigma2
@@ -119,6 +153,10 @@ mu.use_demented <- mu.save[-(1:burn)]
 sigma2.use_demented <- sigma2.save[-(1:burn)]
 plot(mu.use_demented, type='l')
 plot(sigma2.use_demented, type='l')
+```
+
+```{r}
+## plotting posterior distribution for demented
 
 # marginal posterior distribution of mu (NOT conditional on sigma2)
 plot(density(mu.use_demented), xlim=c(0, 10000), xlab=expression(sigma^2), 
@@ -129,9 +167,10 @@ plot(density(sigma2.use_demented), xlim=c(0, 500000), xlab=expression(sigma^2),
      ylab="density", main=expression(pi(sigma^2~"|"~data)))
 ```
 
+The mean and variance of our posterior distribution for demented patients are `r round(mean(mu.use_demented, 4)` and `r round(mean(sigma2.use_demented), 4)` respectively.
+
 ```{r}
 nondemented <- alz %>% filter(Group == 'Nondemented') %>% select(eTIV)
-
 
 # Find the posterior of mu using Gibbs sampling.
 n <- length(nondemented)
@@ -185,6 +224,10 @@ mu.use_nondemented <- mu.save[-(1:burn)]
 sigma2.use_nondemented <- sigma2.save[-(1:burn)]
 plot(mu.use_nondemented, type='l')
 plot(sigma2.use_nondemented, type='l')
+```
+
+```{r}
+## posterior distribution of non-demented
 
 # marginal posterior distribution of mu (NOT conditional on sigma2)
 plot(density(mu.use_nondemented), xlim=c(0, 10000), xlab=expression(sigma^2), 
@@ -195,8 +238,11 @@ plot(density(sigma2.use_nondemented), xlim=c(0, 4000000000), xlab=expression(sig
      ylim=c(0, 0.00000001), ylab="density", main=expression(pi(sigma^2~"|"~data)))
 ```
 
+The mean and variance of our posterior distribution for demented patients are `r round(mean(mu.use_nondemented, 4)` and `r round(mean(sigma2.use_nondemented), 4)` respectively.
+
+
 We want to discover the difference between means
-```{r}
+```{r include=FALSE}
 d <- mu.use_demented - mu.use_nondemented
 # plot(density(d), xlim=c(-500000, 500000), xlab=expression(sigma^2), ylab="density", main=expression(pi(d~"|"~data)) )
 plot(density(d), xlim=c(-5000, 5000), xlab="sigma^2", ylab="density",
@@ -204,9 +250,10 @@ plot(density(d), xlim=c(-5000, 5000), xlab="sigma^2", ylab="density",
 mean(d)
 
 # 95% credible interval
-quantile(d, c(.025, .975)) # The difference between TIV size between demented and nondemented is insignificant since our credible interval contains 0.
+quant <- quantile(d, c(.025, .975)) # The difference between TIV size between demented and nondemented is insignificant since our credible interval contains 0.
 ```
 
+??Given our data, there is a 95% probability that the true difference between the average TIV for demented and non-demented patients is between `r round(quant[1], 4)` and `r round(quant[2], 4)`.
 
 We want to discover the difference between standard deviations
 ```{r}
