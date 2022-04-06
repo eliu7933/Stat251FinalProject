@@ -8,14 +8,16 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, warning=FALSE, message=FALSE, include=FALSE)
+
+# libraries
 library(tidyverse)
 library(invgamma)
 ```
 
 ## Introduction
 
-Alzheimer’s is a brain disease where cells degenerate and cause memory loss. 40 million people worldwide suffer from this disease and a cure does not exist. Although there is no definitive cause of Alzheimer’s, scientists speculate that genetics, aging, and environmental influences may affect the probability of developing the disease. Some specialists have found that the larger the brain, the more the brain may combat against the effects of cognitive atrophy. The total intracranial volume (TIV) is a way to quantify the size of the brain. TIV includes the volume of the cranium, brain, and spinal fluid. To discover how brain size relates to Alzheimer’s, we will investigate the average TIV for patients 60 years and older of those with and without the disease. The parameters of interest is the average TIV for demented and non-demented patients.
+Alzheimer’s is a brain disease where cells degenerate and cause memory loss. 40 million people worldwide suffer from this disease and a cure does not exist. Although there is no definitive cause of Alzheimer’s, scientists speculate that genetics, aging, and environmental influences may affect the probability of developing the disease. Some specialists have found that the larger the brain, the more the brain may combat against the effects of cognitive atrophy. The total intracranial volume (TIV) is a way to quantify the size of the brain. TIV includes the volume of the cranium, brain, and spinal fluid. To discover how brain size relates to Alzheimer’s, we will investigate the average TIV for patients 60 years and older of those with and without the disease. The parameter of interest is the average TIV for demented and non-demented patients.
 
 ## Methods
 
@@ -31,9 +33,9 @@ demented <- alz %>% filter(Group == 'Demented')
 nondemented <- alz %>% filter(Group == 'Nondemented')
 ```
 
-Figure 1 is a plot of the TIV values for demented and nondemented groups. We see that these values have a uniform and bell-shaped distribution therefore, we use a normal distribution with parameters $\mu$ and $\sigma^2$ as the likelihood to model our data. The likelihood of our model is also listed below.
+Figure 1 is a plot of the TIV values for demented and non-demented groups. We see that these values have a uniform and bell-shaped distribution therefore, we use a normal distribution with parameters $\mu$ and $\sigma^2$ as the likelihood to model our data. The likelihood of our model is also listed below.
 
-```{r, fig.cap='Histograms of TIV for Alzheimer's patients.', fig.align='center', out.width='50%', fig.show='hold'}
+```{r, include=TRUE, fig.cap='Histograms of TIV for Alzheimers patients.', fig.show='hold', out.width='50%'}
 
 # histogram for demented patients
 ggplot(demented, aes(x = eTIV)) +
@@ -54,28 +56,30 @@ We assume that the prior parameter $\mu$ which represents that average TIV for b
 
 Prior distribution for demented popluation:
 
-$\mu_D \sim N(\lambda, tau^2)$
+$\mu_D \sim N(\lambda, \tau^2)$
 
 $\sigma_D \sim IG(\gamma, \phi)$
 
 Prior distribution for non-demented population:
 
-$\mu_N \sim N(\lambda, tau^2)$
+$\mu_N \sim N(\lambda, \tau^2)$
 
 $\sigma_N \sim IG(\gamma, \phi)$
 
-```{r}
-# Prior for mu
-prior_mean <- 1500 # lambda
-prior_var <- 31000 # Tau^2
 
-# Prior for sigma2
-prior_gamma <- 1
-prior_phi <- 1
+```{r}
+# prior for mu
+prior_mean <- 1500 # lambda
+prior_var <- 31000 # tau^2
+
+# prior for sigma2
+prior_gamma <- 2
+prior_phi <- 2
 ```
 
 
-```{r}
+```{r, include=TRUE, fig.show='hold', out.width='50%'}
+
 # plot prior distribution of mu
 curve(dnorm(x, prior_mean, sqrt(prior_var)), xlim = c(500, 2500),
       main = 'Prior Distribution of' ~ expression(mu))
@@ -99,151 +103,161 @@ summary(nondemented$eTIV)
 Because of our likelihood and prior distributions, we can approximate a posterior distribution for both populations $\mu$ and $\sigma^2$ with Gibbs sampling.
 
 ```{r}
+# set data
 demented <- alz %>% filter(Group == 'Demented') %>% select(eTIV)
-
-# Find the posterior of mu using Gibbs sampling.
 n <- length(demented)
-# Starting values (This example has extreme starting values just for illustrative purposes)
-lambda <- 1500  # Prior Mean for mu
-tau2 <- 31000  # Prior Variance for mu
-sigma2 <- 1  # Sample Variance
+
+# set prior parameters for mu
+lambda <- prior_mean
+tau2 <- prior_var 
+
+# set prior parameters for sigma2
+gamma <- prior_gamma
+phi <- prior_phi
+
+# set starting values for Gibbs sampling
 mu <- 1500 #????
-
-gamma <- 1  # Prior Gamma for sigma2
-phi <- 1  # Prior Phi for sigma2
-
+sigma2 <- 1  # Sample Variance
 
 # initializations for the Gibbs Sampling Algorithm
 iters <- 10000
-mu.save <- rep(0, iters)
-mu.save[1] <- mu
-sigma2.save <- rep(0, iters)
-sigma2.save[1] <- sigma2
+mu_save <- rep(0, iters)
+sigma2_save <- rep(0, iters)
 
-#Gibbs Sampling Algorithm
+mu_save[1] <- mu
+sigma2_save[1] <- sigma2
+
+# Gibbs Sampling Algorithm
 for(t in 2:iters){
-  # Full conditional of mu (update the value of the parameters)
-  lambda.p <- (tau2*sum(demented) + sigma2*lambda)/(tau2*n + sigma2) #posterior mean of mu given data and sigma^2 aka its full conditional
-  tau2.p <- sigma2*tau2/(tau2*n + sigma2)  # posterior variance
   
-  #sample a new value of mu from its full conditional
-  mu <- rnorm(1, lambda.p, sqrt(tau2.p))
+  # full conditional of mu (update the value of the parameters)
+  lambda_p <- (tau2*sum(demented) + sigma2*lambda) / (tau2*n + sigma2) 
+  tau2_p <- sigma2*tau2 / (tau2*n + sigma2) # posterior variance
   
-  #save the value of mu
-  mu.save[t] <- mu
+  # sample a new value of mu from its full conditional
+  mu <- rnorm(1, lambda_p, sqrt(tau2_p))
+  
+  # save the value of mu
+  mu_save[t] <- mu
   
   # full conditional of sigma2 (update the value of the parameters)
-  gamma.p <- gamma + n/2
-  phi.p <- phi + sum((demented - mu)^2 )/2
+  gamma_p <- gamma + n/2
+  phi_p <- phi + sum((demented - mu)^2)/2
   
-  #sample new value of sigma2 from its full conditional
-  sigma2 <- rinvgamma(1, gamma.p, phi.p)
+  # sample new value of sigma2 from its full conditional
+  sigma2 <- rinvgamma(1, gamma_p, phi_p)
   
-  #save the value of sigma2
-  sigma2.save[t] <- sigma2
+  # save the value of sigma2
+  sigma2_save[t] <- sigma2
 }
 
-# Trace plots (decide if we need to throw out the first few values)
-plot(mu.save, type='l')
-plot(sigma2.save, type='l')
+# trace plots to determine burn-in
+plot(mu_save, type='l')
+plot(sigma2_save, type='l')
 
-#throw out the first few values
+# throw out the first few values
 burn <- 100
-mu.use_demented <- mu.save[-(1:burn)]
-sigma2.use_demented <- sigma2.save[-(1:burn)]
-plot(mu.use_demented, type='l')
-plot(sigma2.use_demented, type='l')
+mu_use_demented <- mu_save[-(1:burn)]
+sigma2_use_demented <- sigma2_save[-(1:burn)]
+plot(mu_use_demented, type='l', ylim = c(0, 20000))
+plot(sigma2_use_demented, type='l', ylim = c(0, 20000000000))
 ```
 
 ```{r}
 ## plotting posterior distribution for demented
 
 # marginal posterior distribution of mu (NOT conditional on sigma2)
-plot(density(mu.use_demented), xlim=c(0, 10000), xlab=expression(sigma^2), 
+plot(density(mu_use_demented), xlim=c(0, 10000), xlab=expression(sigma^2), 
      ylab="density", main=expression(pi(mu~"|"~data)))
 
 # marginal posterior distribution of sigma2 (NOT conditional on sigma2)
-plot(density(sigma2.use_demented), xlim=c(0, 500000), xlab=expression(sigma^2), 
+plot(density(sigma2_use_demented), 
+     xlim = c(0, 1000),  
+     ylim = c(0.000000002, 0.000000004),
+     xlab=expression(sigma^2), 
      ylab="density", main=expression(pi(sigma^2~"|"~data)))
 ```
 
-The mean and variance of our posterior distribution for demented patients are `r round(mean(mu.use_demented, 4)` and `r round(mean(sigma2.use_demented), 4)` respectively.
+The mean and variance of our posterior distribution for demented patients are `r round(mean(mu.use_demented), 4)` and `r round(mean(sigma2.use_demented), 4)` respectively.
 
 ```{r}
+# set data
 nondemented <- alz %>% filter(Group == 'Nondemented') %>% select(eTIV)
-
-# Find the posterior of mu using Gibbs sampling.
 n <- length(nondemented)
-# Starting values (This example has extreme starting values just for illustrative purposes)
-lambda <- 1500  # Prior Mean for mu
-tau2 <- 31000  # Prior Variance for mu
-sigma2 <- 1  # Sample Variance
 
-gamma <- 1  # Prior Gamma for sigma2
-phi <- 1  # Prior Phi for sigma2
+# set prior parameters for mu
+lambda <- prior_mean
+tau2 <- prior_var
 
+# set prior for sigma2
+gamma <- prior_gamma
+phi <- prior_phi
+
+# set starting values for Gibbs sampling
+mu <- 1500
+sigma2 <- 1
 
 # initializations for the Gibbs Sampling Algorithm
 iters <- 10000
-mu.save <- rep(0, iters)
-mu <- 1500
-mu.save[1] <- mu
-sigma2.save <- rep(0, iters)
-sigma2.save[1] <- sigma2
+mu_save <- rep(0, iters)
+sigma2_save <- rep(0, iters)
 
-#Gibbs Sampling Algorithm
+mu_save[1] <- mu
+sigma2_save[1] <- sigma2
+
+# Gibbs Sampling Algorithm
 for(t in 2:iters){
-  # Full conditional of mu (update the value of the parameters)
-  lambda.p <- (tau2*sum(nondemented) + sigma2*lambda)/(tau2*n + sigma2) #posterior mean of mu given data and sigma^2 aka its full conditional
-  tau2.p <- sigma2*tau2/(tau2*n + sigma2)  # posterior variance
   
-  #sample a new value of mu from its full conditional
-  mu <- rnorm(1, lambda.p, sqrt(tau2.p))
+  # full conditional of mu (update the value of the parameters)
+  lambda_p <- (tau2*sum(nondemented) + sigma2*lambda)/(tau2*n + sigma2)
+  tau2_p <- sigma2*tau2/(tau2*n + sigma2)
   
-  #save the value of mu
-  mu.save[t] <- mu
+  # sample a new value of mu from its full conditional
+  mu <- rnorm(1, lambda_p, sqrt(tau2_p))
+  
+  # save the value of mu
+  mu_save[t] <- mu
   
   # full conditional of sigma2 (update the value of the parameters)
-  gamma.p <- gamma + n/2
-  phi.p <- phi + sum((nondemented - mu)^2 )/2
+  gamma_p <- gamma + n/2
+  phi_p <- phi + sum((nondemented - mu)^2 )/2
   
-  #sample new value of sigma2 from its full conditional
-  sigma2 <- rinvgamma(1, gamma.p, phi.p)
+  # sample new value of sigma2 from its full conditional
+  sigma2 <- rinvgamma(1, gamma_p, phi_p)
   
-  #save the value of sigma2
-  sigma2.save[t] <- sigma2
+  # save the value of sigma2
+  sigma2_save[t] <- sigma2
 }
 
-# Trace plots (decide if we need to throw out the first few values)
-plot(mu.save, type='l')
-plot(sigma2.save, type='l')
+# trace plots to determine burn-in
+plot(mu_save, type='l')
+plot(sigma2_save, type='l')
 
-#throw out the first few values
+# throw out the first few values
 burn <- 100
-mu.use_nondemented <- mu.save[-(1:burn)]
-sigma2.use_nondemented <- sigma2.save[-(1:burn)]
-plot(mu.use_nondemented, type='l')
-plot(sigma2.use_nondemented, type='l')
+mu_use_nondemented <- mu_save[-(1:burn)]
+sigma2_use_nondemented <- sigma2_save[-(1:burn)]
+plot(mu_use_nondemented, type='l')
+plot(sigma2_use_nondemented, type='l')
 ```
 
 ```{r}
 ## posterior distribution of non-demented
 
 # marginal posterior distribution of mu (NOT conditional on sigma2)
-plot(density(mu.use_nondemented), xlim=c(0, 10000), xlab=expression(sigma^2), 
+plot(density(mu_use_nondemented), xlim=c(0, 10000), xlab=expression(sigma^2), 
      ylab="density", main=expression(pi(mu~"|"~data)))
 
 # marginal posterior distribution of sigma2 (NOT conditional on sigma2)
-plot(density(sigma2.use_nondemented), xlim=c(0, 4000000000), xlab=expression(sigma^2), 
+plot(density(sigma2_use_nondemented), xlim=c(0, 4000000000), xlab=expression(sigma^2), 
      ylim=c(0, 0.00000001), ylab="density", main=expression(pi(sigma^2~"|"~data)))
 ```
 
-The mean and variance of our posterior distribution for demented patients are `r round(mean(mu.use_nondemented, 4)` and `r round(mean(sigma2.use_nondemented), 4)` respectively.
-
+The mean and variance of our posterior distribution for demented patients are `r round(mean(mu_use_nondemented), 4)` and `r round(mean(sigma2_use_nondemented), 4)` respectively.
 
 We want to discover the difference between means
 ```{r include=FALSE}
-d <- mu.use_demented - mu.use_nondemented
+d <- mu_use_demented - mu_use_nondemented
 # plot(density(d), xlim=c(-500000, 500000), xlab=expression(sigma^2), ylab="density", main=expression(pi(d~"|"~data)) )
 plot(density(d), xlim=c(-5000, 5000), xlab="sigma^2", ylab="density",
      main="Posterior dist of urban-rural" )
@@ -255,9 +269,22 @@ quant <- quantile(d, c(.025, .975)) # The difference between TIV size between de
 
 ??Given our data, there is a 95% probability that the true difference between the average TIV for demented and non-demented patients is between `r round(quant[1], 4)` and `r round(quant[2], 4)`.
 
+```{r}
+## posterior predictive
+
+# posterior predictive
+dem_postpred <- rnorm(100000, mu_use_demented, sqrt(sigma2_use_demented))
+nondem_postpred <- rnorm(100000, mu_use_nondemented, sqrt(sigma2_use_nondemented))
+
+# plot the posterior predictive
+plot(density(dem_postpred), xlim = c(-10000, 10000))
+plot(density(nondem_postpred), xlim = c(-5000000000, 5000000000))# add = TRUE)
+
+```
+
 We want to discover the difference between standard deviations
 ```{r}
-d <- sqrt(sigma2.use_demented) - sqrt(sigma2.use_nondemented)
+d <- sqrt(sigma2_use_demented) - sqrt(sigma2_use_nondemented)
 # plot(density(d), xlim=c(-500000, 500000), xlab=expression(sigma^2), ylab="density", main=expression(pi(d~"|"~data)) )
 plot(density(d), xlim=c(-30000, 30000), xlab="sigma^2", ylab="density",
      main="Posterior dist of urban-rural" )
