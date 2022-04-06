@@ -8,11 +8,14 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, warning=FALSE, message=FALSE, include=FALSE)
+knitr::opts_chunk$set(echo=FALSE, warning=FALSE, message=FALSE)
 
 # libraries
 library(tidyverse)
 library(invgamma)
+
+# set seed
+set.seed(1234)
 ```
 
 ## Introduction
@@ -35,42 +38,52 @@ nondemented <- alz %>% filter(Group == 'Nondemented')
 
 Figure 1 is a plot of the TIV values for demented and non-demented groups. We see that these values have a uniform and bell-shaped distribution therefore, we use a normal distribution with parameters $\mu$ and $\sigma^2$ as the likelihood to model our data. The likelihood of our model is also listed below.
 
-```{r, include=TRUE, fig.cap='Histograms of TIV for Alzheimers patients.', fig.show='hold', out.width='50%'}
+```{r, fig.cap='Histograms of TIV for Alzheimers patients.', fig.show='hold', out.width='50%'}
 
 # histogram for demented patients
 ggplot(demented, aes(x = eTIV)) +
   geom_histogram() +
   theme_bw() +
-  labs(title = 'Histogram of TIV for Demented Patients')
+  theme(panel.grid = element_blank()) +
+  scale_y_continuous(expand = c(0, 0), limits = c(0, 23)) +
+  labs(title = 'Histogram of TIV for Demented Patients',
+       x = 'TIV',
+       y = 'Patient Count')
 
 # histogram for nondemented patients
 ggplot(nondemented, aes(x = eTIV)) +
   geom_histogram() +
   theme_bw() +
-  labs(title = 'Histogram of TIV for Nondemented Patients')
+  theme(panel.grid = element_blank()) +
+  scale_y_continuous(expand = c(0, 0), limits = c(0, 20)) +
+  labs(title = 'Histogram of TIV for Non-demented Patients',
+       x = 'TIV',
+       y = 'Patient Count')
 ```
 
 $x_i | \mu, \sigma^2 \sim N(\mu, \sigma^2),\,\,i = 1, ...n$
 
-We assume that the prior parameter $\mu$ which represents that average TIV for both populations, is normally distributed. We also assume that the variance denoted by $\sigma^2$ follows an inverse gamma distribution because the variance of TIV for both populations is positive and right-skewed. The distributions of the prior distributions for our parameters are listed below. We assume the prior distributions for both the demented (D) and nondemented (N) populations to be the same.
+We assume that the prior parameter $\mu$ which represents that average TIV for both populations, is normally distributed. We also assume that the variance denoted by $\sigma^2$ follows an inverse gamma distribution because the variance of TIV for both populations is positive and right-skewed. The distributions of the prior distributions for our parameters are listed below. We assume the prior distributions for both the demented (D) and non-demented (N) populations to be the same.
 
-Prior distribution for demented popluation:
+\begin{center}
+\textbf{Prior distribution for demented population}
 
 $\mu_D \sim N(\lambda, \tau^2)$
 
 $\sigma_D \sim IG(\gamma, \phi)$
 
-Prior distribution for non-demented population:
+\textbf{Prior distribution for non-demented population}
 
 $\mu_N \sim N(\lambda, \tau^2)$
 
 $\sigma_N \sim IG(\gamma, \phi)$
+\end{center}
 
 
 ```{r}
 # prior for mu
 prior_mean <- 1500 # lambda
-prior_var <- 31000 # tau^2
+prior_var <- 500000 # tau^2
 
 # prior for sigma2
 prior_gamma <- 2
@@ -78,15 +91,20 @@ prior_phi <- 2
 ```
 
 
-```{r, include=TRUE, fig.show='hold', out.width='50%'}
+```{r, fig.cap='Prior distribution for the TIV measurement for a randomly selected patient.', fig.show='hold', out.width='50%'}
 
 # plot prior distribution of mu
-curve(dnorm(x, prior_mean, sqrt(prior_var)), xlim = c(500, 2500),
-      main = 'Prior Distribution of' ~ expression(mu))
+curve(dnorm(x, prior_mean, sqrt(prior_var)), 
+      xlim = c(-1000, 4000),
+      main = 'Prior Distribution of' ~mu,
+      xlab = ~mu,
+      ylab = 'Density')
 
 # plot prior distribution of sigma2
-curve(dinvgamma(x, prior_gamma, sqrt(prior_phi)), xlim = c(0, 200),
-      main = 'Prior Distribution of' ~ expression(sigma^2))
+curve(dinvgamma(x, prior_gamma, prior_phi), xlim = c(0, 10),
+      main = 'Prior Distribution of' ~sigma^2,
+      xlab = ~sigma^2,
+      ylab = 'Density')
 ```
 
 In order to investigate this question, we analyzed a dataset taken from Kaggle that includes data from a sampled set of patients 60 years and older. Metrics collected on these individuals include whether they have Alzheimer’s (our response variable), gender, age, education level, TIV measurements (our explanatory variable), and other physiological characteristics. The outcome variable of interest is whether the patient is demented or non-demented.
@@ -94,18 +112,34 @@ In order to investigate this question, we analyzed a dataset taken from Kaggle t
 ??put in kable
 ```{r}
 # summaries of data
-summary(demented$eTIV)
-summary(nondemented$eTIV)
+dem_stat <- as.integer(summary(demented$eTIV))
+nondem_stat <- as.integer(summary(nondemented$eTIV))
+
+row_names <- c('Min', 'Q1', 'Median', 'Mean', 'Q3', 'Max')
+
+alz_stat <- as.data.frame(cbind(dem_stat, nondem_stat),
+              row.names = row_names)
+colnames(alz_stat) <- c('Demented', 'Non-Demented')
+
+knitr::kable(
+  alz_stat,
+  col.names = c('Demented', 'Non-Demented'),
+  digits = 3,
+  caption = 'Patient TIV Summary Statistics'
+)
+
+# alz_stat %>% kableExtra::kbl(caption = 'Patient TIV Summary Statistics') %>%
+#   kableExtra::kable_classic(full_width = FALSE, html_font = 'Cambria')
 ```
 
 ## Results
 
 Because of our likelihood and prior distributions, we can approximate a posterior distribution for both populations $\mu$ and $\sigma^2$ with Gibbs sampling.
 
-```{r}
+```{r, include=FALSE}
 # set data
 demented <- alz %>% filter(Group == 'Demented') %>% select(eTIV)
-n <- length(demented)
+n <- nrow(demented)
 
 # set prior parameters for mu
 lambda <- prior_mean
@@ -116,8 +150,8 @@ gamma <- prior_gamma
 phi <- prior_phi
 
 # set starting values for Gibbs sampling
-mu <- 1500 #????
-sigma2 <- 1  # Sample Variance
+mu <- 1500
+sigma2 <- 1
 
 # initializations for the Gibbs Sampling Algorithm
 iters <- 10000
@@ -159,31 +193,40 @@ plot(sigma2_save, type='l')
 burn <- 100
 mu_use_demented <- mu_save[-(1:burn)]
 sigma2_use_demented <- sigma2_save[-(1:burn)]
-plot(mu_use_demented, type='l', ylim = c(0, 20000))
-plot(sigma2_use_demented, type='l', ylim = c(0, 20000000000))
+plot(mu_use_demented, type='l')
+plot(sigma2_use_demented, type='l')
 ```
 
-```{r}
+```{r fig.cap='Posterior distribution for average the TIV measurement of a patient with Alzheimers.', fig.show='hold', out.width='50%'}
 ## plotting posterior distribution for demented
 
 # marginal posterior distribution of mu (NOT conditional on sigma2)
-plot(density(mu_use_demented), xlim=c(0, 10000), xlab=expression(sigma^2), 
-     ylab="density", main=expression(pi(mu~"|"~data)))
+plot(density(mu_use_demented), xlim=c(1400, 1600), 
+     xlab = ~mu, 
+     ylab = "Density", 
+     main = expression(pi(mu~"|"~data)))
 
-# marginal posterior distribution of sigma2 (NOT conditional on sigma2)
-plot(density(sigma2_use_demented), 
-     xlim = c(0, 1000),  
-     ylim = c(0.000000002, 0.000000004),
-     xlab=expression(sigma^2), 
-     ylab="density", main=expression(pi(sigma^2~"|"~data)))
+# marginal posterior distribution of sigma2 (NOT conditional on mu)
+# plot(density(sigma2_use_demented), 
+#      # xlim = c(0, 1000),  
+#      # ylim = c(0.000000002, 0.000000004),
+#      xlab=expression(sigma^2), 
+#      ylab="Density", main=expression(pi(sigma^2~"|"~data)))
+
+
+# marginal posterior distribution of sigma (NOT conditional on mu)
+plot(density(sqrt(sigma2_use_demented)), 
+     xlab = ~sigma, 
+     ylab = "Density", 
+     main = expression(pi(sigma~"|"~data)))
 ```
 
-The mean and variance of our posterior distribution for demented patients are `r round(mean(mu.use_demented), 4)` and `r round(mean(sigma2.use_demented), 4)` respectively.
+The mean and variance of our posterior distribution for demented patients are `r round(mean(mu_use_demented), 4)` and `r round(mean(sigma2_use_demented), 4)` respectively.
 
-```{r}
+```{r include=FALSE}
 # set data
 nondemented <- alz %>% filter(Group == 'Nondemented') %>% select(eTIV)
-n <- length(nondemented)
+n <- nrow(nondemented)
 
 # set prior parameters for mu
 lambda <- prior_mean
@@ -241,56 +284,59 @@ plot(mu_use_nondemented, type='l')
 plot(sigma2_use_nondemented, type='l')
 ```
 
-```{r}
+```{r fig.cap='Posterior distribution for average the TIV measurement of a patient without Alzheimers.', fig.show='hold', out.width='50%'}
 ## posterior distribution of non-demented
 
-# marginal posterior distribution of mu (NOT conditional on sigma2)
-plot(density(mu_use_nondemented), xlim=c(0, 10000), xlab=expression(sigma^2), 
-     ylab="density", main=expression(pi(mu~"|"~data)))
+# marginal posterior distribution of mu
+plot(density(mu_use_nondemented), 
+     xlab = ~mu, 
+     ylab = "Density", 
+     main = expression(pi(mu~"|"~data)))
 
-# marginal posterior distribution of sigma2 (NOT conditional on sigma2)
-plot(density(sigma2_use_nondemented), xlim=c(0, 4000000000), xlab=expression(sigma^2), 
-     ylim=c(0, 0.00000001), ylab="density", main=expression(pi(sigma^2~"|"~data)))
+# marginal posterior distribution of sqrt(sigma2) (standard deviation)
+plot(density(sqrt(sigma2_use_nondemented)), 
+     xlab = ~sigma, 
+     ylab = "Density", 
+     main = expression(pi(sigma~"|"~data)))
 ```
 
 The mean and variance of our posterior distribution for demented patients are `r round(mean(mu_use_nondemented), 4)` and `r round(mean(sigma2_use_nondemented), 4)` respectively.
 
-We want to discover the difference between means
-```{r include=FALSE}
+We conducted this analysis because we wanted to understand if there was a difference between average TIV measurements of patients with and without Alzheimer’s. In the plot below (posterior distribution of the difference in means), we see that the average TIV difference (Demented - Nondemented) is -9.466. This means that on average, the non-demented patients have 9.466 cm^3 more total intracranial volume than demented patients. This confirms our hunch that Alzheimer’s erodes away brain matter. The 95% credible interval of this distribution is between -47.7 and 28.8. Because this credible interval contains zero, we conclude that these results are not significant.
+
+```{r fig.cap='Posterior distribution for the difference in average TIV measurements between patients with and without Alzheimers.', fig.align='center', fig.show='hold', out.width='50%'}
+
+# take difference between distribution
 d <- mu_use_demented - mu_use_nondemented
-# plot(density(d), xlim=c(-500000, 500000), xlab=expression(sigma^2), ylab="density", main=expression(pi(d~"|"~data)) )
-plot(density(d), xlim=c(-5000, 5000), xlab="sigma^2", ylab="density",
-     main="Posterior dist of urban-rural" )
-mean(d)
+
+# plot posterior distribution in difference of means
+plot(density(d), 
+     xlim = c(-100, 100), 
+     xlab= expression(~mu_D~'-'~mu_N), 
+     ylab = "Density",
+     main = 'Posterior Distribution of Difference in Means')
+
+# measure the mean of the distribution
+postdiff_mu <- mean(d)
 
 # 95% credible interval
-quant <- quantile(d, c(.025, .975)) # The difference between TIV size between demented and nondemented is insignificant since our credible interval contains 0.
+quant <- quantile(d, c(.025, .975)) 
+# The difference between TIV size between demented and nondemented is insignificant since our credible interval contains 0.
 ```
 
-??Given our data, there is a 95% probability that the true difference between the average TIV for demented and non-demented patients is between `r round(quant[1], 4)` and `r round(quant[2], 4)`.
-
-```{r}
+```{r include=FALSE, fig.cap='Posterior predictive distribution for the difference in average TIV measurements between patients with and without Alzheimers.', fig.show='hold', out.width='50%'}
 ## posterior predictive
 
-# posterior predictive
+# posterior predictive for both populations
 dem_postpred <- rnorm(100000, mu_use_demented, sqrt(sigma2_use_demented))
 nondem_postpred <- rnorm(100000, mu_use_nondemented, sqrt(sigma2_use_nondemented))
 
-# plot the posterior predictive
-plot(density(dem_postpred), xlim = c(-10000, 10000))
-plot(density(nondem_postpred), xlim = c(-5000000000, 5000000000))# add = TRUE)
-
+# plot the posterior predictive for both populations
+plot(density(dem_postpred),
+     xlim = c(500, 2500),
+     main = 'Posterior Predictive Distribution for Patients With Alzheimer\'s',
+     xlab = 'TIV')
+plot(density(nondem_postpred), xlim = c(500, 2500),
+     main = 'Posterior Predictive Distribution for Patients Without Alzheimer\'s',
+     xlab = 'TIV')
 ```
-
-We want to discover the difference between standard deviations
-```{r}
-d <- sqrt(sigma2_use_demented) - sqrt(sigma2_use_nondemented)
-# plot(density(d), xlim=c(-500000, 500000), xlab=expression(sigma^2), ylab="density", main=expression(pi(d~"|"~data)) )
-plot(density(d), xlim=c(-30000, 30000), xlab="sigma^2", ylab="density",
-     main="Posterior dist of urban-rural" )
-mean(d)
-
-# 95% credible interval
-quantile(d, c(.025, .975)) # The difference between the standard deviation of TIV size between demented and nondemented is insignificant since our credible interval contains 0.
-```
-
