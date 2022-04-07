@@ -1,8 +1,9 @@
 ---
-title: "Stat251 Final Project"
-author: "Emily Liu"
+title: "A study of Intracranial Volume and Alzheimer's Patients"
+author: "Emily Liu and Nick Hass"
+subtitle: "Stat 251 Final Project"
 date: "3/25/2022"
-output:
+output: 
   pdf_document: default
   html_document: default
 ---
@@ -13,6 +14,7 @@ knitr::opts_chunk$set(echo=FALSE, warning=FALSE, message=FALSE)
 # libraries
 library(tidyverse)
 library(invgamma)
+library(latex2exp)
 
 # set seed
 set.seed(1234)
@@ -20,7 +22,9 @@ set.seed(1234)
 
 ## Introduction
 
-Alzheimer’s is a brain disease where cells degenerate and cause memory loss. 40 million people worldwide suffer from this disease and a cure does not exist. Although there is no definitive cause of Alzheimer’s, scientists speculate that genetics, aging, and environmental influences may affect the probability of developing the disease. Some specialists have found that the larger the brain, the more the brain may combat against the effects of cognitive atrophy. The total intracranial volume (TIV) is a way to quantify the size of the brain. TIV includes the volume of the cranium, brain, and spinal fluid. To discover how brain size relates to Alzheimer’s, we will investigate the average TIV for patients 60 years and older of those with and without the disease. The parameter of interest is the average TIV for demented and non-demented patients.
+Alzheimer’s is a brain disease where cells degenerate and cause memory loss. 40 million people worldwide suffer from this disease and a cure does not exist. Although there is no definitive cause of Alzheimer’s, scientists speculate that genetics, aging, and environmental influences may affect the probability of developing the disease. Some specialists have found that the larger the brain, the more the brain may combat against the effects of cognitive atrophy. The total intracranial volume (TIV) is a way to quantify the size of the brain. TIV includes the volume of the cranium, brain, and spinal fluid. To discover how brain size relates to Alzheimer’s, we will investigate the average TIV for patients 60 years and older of those with and without the disease. Do those with Alzheimer's have a smaller total intracranial volume than those without Alzheimer's? The parameter of interest is the average TIV for demented and non-demented patients.
+
+In order to investigate this question, we analyzed a dataset taken from Kaggle that includes data from a sampled set of patients 60 years and older. Metrics collected on these individuals include whether they have Alzheimer’s (our two groups), gender, age, education level, TIV measurements (our explanatory variable), and other physiological characteristics. To be clear, we are referring to Alzheimer's patients as all patients in the study, this includes two groups of interest, those who are demented and those who are not.
 
 ## Methods
 
@@ -36,9 +40,9 @@ demented <- alz %>% filter(Group == 'Demented')
 nondemented <- alz %>% filter(Group == 'Nondemented')
 ```
 
-Figure 1 is a plot of the TIV values for demented and non-demented groups. We see that these values have a uniform and bell-shaped distribution therefore, we use a normal distribution with parameters $\mu$ and $\sigma^2$ as the likelihood to model our data. The likelihood of our model is also listed below.
+Figure 1 is a plot of the estimated TIV measurement for demented and non-demented groups. We see that these values have a uniform and bell-shaped distribution therefore, we use a normal distribution with parameters $\mu$ and $\sigma^2$ as the likelihood to model our data. The likelihood model is listed below the plots.
 
-```{r, fig.cap='Histograms of TIV for Alzheimers patients.', fig.show='hold', out.width='50%'}
+```{r, fig.cap='Histograms of TIV for Alzheimers patients in cm cubed.', fig.show='hold', out.width='50%'}
 
 # histogram for demented patients
 ggplot(demented, aes(x = eTIV)) +
@@ -61,9 +65,11 @@ ggplot(nondemented, aes(x = eTIV)) +
        y = 'Patient Count')
 ```
 
-$x_i | \mu, \sigma^2 \sim N(\mu, \sigma^2),\,\,i = 1, ...n$
+Likelihood: $x_i | \mu, \sigma^2 \sim N(\mu, \sigma^2),\,\,i = 1, ...n$
 
-We assume that the prior parameter $\mu$ which represents that average TIV for both populations, is normally distributed. We also assume that the variance denoted by $\sigma^2$ follows an inverse gamma distribution because the variance of TIV for both populations is positive and right-skewed. The distributions of the prior distributions for our parameters are listed below. We assume the prior distributions for both the demented (D) and non-demented (N) populations to be the same.
+We assume that the prior parameter $\mu$ (which represents that average TIV for both populations), is normally distributed. We also assume that the variance denoted by $\sigma^2$ follows an inverse gamma distribution because the variance of TIV for both populations is positive and right-skewed. The distributions of the prior distributions for our parameters are listed below. We assume the prior distributions for both the demented (D) and non-demented (N) populations to be the same. 
+
+To choose the prior parameters for $\mu$, we chose a reasonable value for the prior mean, 1500, and an uninformative, or very large variance, 500000, on that mean because of our inexpertise in the subject. To choose the prior parameters for $\sigma$, which follows an inverse gamma distribution, we used very uninformative parameter values for gamma and phi, of 2 and 2, respectively.
 
 \begin{center}
 \textbf{Prior distribution for demented population}
@@ -107,9 +113,10 @@ curve(dinvgamma(x, prior_gamma, prior_phi), xlim = c(0, 10),
       ylab = 'Density')
 ```
 
-In order to investigate this question, we analyzed a dataset taken from Kaggle that includes data from a sampled set of patients 60 years and older. Metrics collected on these individuals include whether they have Alzheimer’s (our response variable), gender, age, education level, TIV measurements (our explanatory variable), and other physiological characteristics. The outcome variable of interest is whether the patient is demented or non-demented.
 
-??put in kable
+In order to investigate the question, do those with Alzheimer's have a different total intracranial volume than those without Alzheimer's, on average?, we analyzed a data set taken from Kaggle that includes data from a sampled set of patients 60 years and older. Metrics collected on these individuals include whether they have Alzheimer’s (our response variable), gender, age, education level, TIV measurements (our explanatory variable), and other physiological characteristics.
+
+
 ```{r}
 # summaries of data
 dem_stat <- as.integer(summary(demented$eTIV))
@@ -134,7 +141,7 @@ knitr::kable(
 
 ## Results
 
-Because of our likelihood and prior distributions, we can approximate a posterior distribution for both populations $\mu$ and $\sigma^2$ with Gibbs sampling.
+Because of our likelihood and prior distributions, we can approximate a posterior distribution for both populations $\mu$ and $\sigma^2$ using a Gibbs sampler.
 
 ```{r, include=FALSE}
 # set data
@@ -197,7 +204,7 @@ plot(mu_use_demented, type='l')
 plot(sigma2_use_demented, type='l')
 ```
 
-```{r fig.cap='Posterior distribution for average the TIV measurement of a patient with Alzheimers.', fig.show='hold', out.width='50%'}
+```{r, fig.cap='Posterior distribution for the average TIV measurement of patients with Alzheimers.', fig.show='hold', out.width='50%'}
 ## plotting posterior distribution for demented
 
 # marginal posterior distribution of mu (NOT conditional on sigma2)
@@ -221,7 +228,7 @@ plot(density(sqrt(sigma2_use_demented)),
      main = expression(pi(sigma~"|"~data)))
 ```
 
-The mean and variance of our posterior distribution for demented patients are `r round(mean(mu_use_demented), 4)` and `r round(mean(sigma2_use_demented), 4)` respectively.
+As seen in Figure 3, the mean and variance of our posterior distribution for demented patients are `r round(mean(mu_use_demented), 4)` and `r round(mean(sigma2_use_demented), 4)` respectively.
 
 ```{r include=FALSE}
 # set data
@@ -284,7 +291,9 @@ plot(mu_use_nondemented, type='l')
 plot(sigma2_use_nondemented, type='l')
 ```
 
-```{r fig.cap='Posterior distribution for average the TIV measurement of a patient without Alzheimers.', fig.show='hold', out.width='50%'}
+ 
+```{r Non Demented Plots, fig.cap='Posterior distribution for the average TIV measurement of patients without Alzheimers.', fig.show='hold', out.width='50%'}
+
 ## posterior distribution of non-demented
 
 # marginal posterior distribution of mu
@@ -300,11 +309,12 @@ plot(density(sqrt(sigma2_use_nondemented)),
      main = expression(pi(sigma~"|"~data)))
 ```
 
-The mean and variance of our posterior distribution for demented patients are `r round(mean(mu_use_nondemented), 4)` and `r round(mean(sigma2_use_nondemented), 4)` respectively.
+As seen in Figure 4, the mean and variance of our posterior distribution for demented patients are `r round(mean(mu_use_nondemented), 4)` and `r round(mean(sigma2_use_nondemented), 4)` respectively.
 
-We conducted this analysis because we wanted to understand if there was a difference between average TIV measurements of patients with and without Alzheimer’s. In the plot below (posterior distribution of the difference in means), we see that the average TIV difference (Demented - Nondemented) is -9.466. This means that on average, the non-demented patients have 9.466 cm^3 more total intracranial volume than demented patients. This confirms our hunch that Alzheimer’s erodes away brain matter. The 95% credible interval of this distribution is between -47.7 and 28.8. Because this credible interval contains zero, we conclude that these results are not significant.
 
-```{r fig.cap='Posterior distribution for the difference in average TIV measurements between patients with and without Alzheimers.', fig.align='center', fig.show='hold', out.width='50%'}
+We conducted this analysis because we wanted to understand if there was a difference between average TIV measurements of patients with and without Alzheimer’s. In Figure 5, (posterior distribution of the difference in means), we see that the average TIV difference (Demented - Nondemented) is -9.466. This means that on average, the non-demented patients have 9.466 $cm^3$ more total intracranial volume than demented patients. This possibly confirms our hunch that Alzheimer’s erodes away brain matter. The 95% credible interval of this distribution is between -47.7 and 28.8. Because this credible interval contains zero, we conclude that these results are not significant and we cannot confidently say that those with Alzheimer's have a smaller TIV than those without Alzheimer's.
+
+```{r, fig.cap='Posterior distribution for the difference in average TIV measurements between patients with and without Alzheimers.', fig.align='center', fig.show='hold', out.width='50%'}
 
 # take difference between distribution
 d <- mu_use_demented - mu_use_nondemented
@@ -312,7 +322,7 @@ d <- mu_use_demented - mu_use_nondemented
 # plot posterior distribution in difference of means
 plot(density(d), 
      xlim = c(-100, 100), 
-     xlab= expression(~mu_D~'-'~mu_N), 
+     xlab = TeX("Posterior of $mu_D - mu_N$"),
      ylab = "Density",
      main = 'Posterior Distribution of Difference in Means')
 
@@ -321,22 +331,68 @@ postdiff_mu <- mean(d)
 
 # 95% credible interval
 quant <- quantile(d, c(.025, .975)) 
-# The difference between TIV size between demented and nondemented is insignificant since our credible interval contains 0.
+# The difference between TIV size between demented and 
+# nondemented is insignificant since our credible interval contains 0.
 ```
 
-```{r include=FALSE, fig.cap='Posterior predictive distribution for the difference in average TIV measurements between patients with and without Alzheimers.', fig.show='hold', out.width='50%'}
+```{r, include=FALSE, fig.cap='Posterior predictive distribution for the difference in average TIV measurements between patients with and without Alzheimers.', fig.show='hold', out.width='50%'}
 ## posterior predictive
 
 # posterior predictive for both populations
-dem_postpred <- rnorm(100000, mu_use_demented, sqrt(sigma2_use_demented))
-nondem_postpred <- rnorm(100000, mu_use_nondemented, sqrt(sigma2_use_nondemented))
+dem_postpred <- rnorm(100000, 
+                      mu_use_demented, 
+                      sqrt(sigma2_use_demented))
+nondem_postpred <- rnorm(100000, 
+                         mu_use_nondemented, 
+                         sqrt(sigma2_use_nondemented))
 
 # plot the posterior predictive for both populations
 plot(density(dem_postpred),
      xlim = c(500, 2500),
-     main = 'Posterior Predictive Distribution for Patients With Alzheimer\'s',
+     main = "Posterior Predictive Distribution for Patients With Alzheimer's",
      xlab = 'TIV')
 plot(density(nondem_postpred), xlim = c(500, 2500),
-     main = 'Posterior Predictive Distribution for Patients Without Alzheimer\'s',
+     main = "Posterior Predictive Distribution for Patients Without Alzheimer's",
      xlab = 'TIV')
 ```
+
+\pagebreak
+## Conclusion
+
+The average difference of means between TIV in patients with and without Alzheimer’s is -9.466 $cm^3$, which is less than 0. This means that on average, patients with Alzheimer’s have slightly smaller TIV than those without Alzheimer’s. However, our results show that this conclusion was insignificant, because a 95% confidence interval is a range that covers 0.
+
+As the Prior vs Posterior Comparison plot below shows, our knowledge beforehand covered a very wide range and had little probability mass where the posterior distribution lies. The data changed our knowledge drastically and has given us more information about the TIV measurements in those 60 years and older with and without Alzheimer's.
+
+```{r, fig.cap='Prior vs Posterior Comparison.', fig.align='center', out.width='50%'}
+# marginal posterior distribution of mu_Demented
+plot(density(mu_use_demented), xlim=c(1400, 1600), ylim=c(0, 0.03),
+     xlab = ~mu, 
+     ylab = "Density", 
+     main = "Prior vs Posterior Comparison")
+
+# marginal posterior distribution of mu_NonDemented
+lines(density(mu_use_nondemented), lty=2)
+
+curve(dnorm(x, prior_mean, sqrt(prior_var)), add=T, lty = 3) # Prior
+
+legend('topright', 
+       legend = c(TeX("Posterior of $mu_D$"), 
+                  TeX("Posterior of $mu_{ND}$"), 
+                  TeX("Prior of $mu_D$ and $mu_{ND}")),
+       lty = c(1, 2, 3),
+       cex = 0.8)
+```
+
+
+Because our results are insignificant, we feel that it would be irresponsible to present a posterior predictive distribution. There is a 1800 $cm^3$ range of normal TIV measurement values that an individual may have. Because an estimated total intracranial volume is so variable from person to person, we wish to not alarm the public over insignificant results. For example, A random person with a smaller TIV measurement, may or may not have Alzheimer’s. Because our difference in averages are insignificant, a prediction like this would be even more insignificant.
+
+A new question we are interested in is how brain size changes by age between those people developing and not developing Alzheimer’s. This may be useful in detecting if one may be more likely to develop Alzheimer’s. Another question for further research is: How quickly does Alzheimer’s erase one’s memory? Is there a difference in this speed between those diagnosed with early-onset Alzheimer’s and those diagnosed with late-onset Alzheimer’s?
+
+
+\newpage
+
+## Appendix
+
+```{r ref.label=knitr::all_labels(), echo = T, eval = F}
+```
+
